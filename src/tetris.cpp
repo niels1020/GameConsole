@@ -82,6 +82,12 @@ bool operator==(Vector2i a, Vector2i b)
     return (a.x == b.x && a.y == b.y);
 }
 
+// checks if there is a piece at the specific location in the board
+bool isPiece(uint x, uint y)
+{
+    return board[x][y] != BLOCK_COLOR_COUNT;
+}
+
 void drawPiece(uint16_t x, uint16_t y, uint colorIndex)
 {
     // background
@@ -175,20 +181,24 @@ void setFallingBlockPieces()
 
 void redrawBoard()
 {
+    printf("redrawing board\n");
     st7789_fill(BACKGROUND_COLOR);
-    GraphicsDrawRect(69, 0, 102, 240, COLOR_GRAY);
-    for (uint x = 0; x < BOARD_WIDTH; x++)
+    GraphicsDrawRect(69, 0, 102, 239, COLOR_GRAY);
+    for (uint16_t x = 0; x < BOARD_WIDTH; x++)
     {
         uint *column = board[x];
-        for (uint y = 0; y < BOARD_HEIGHT; y++)
+        for (uint16_t y = 0; y < BOARD_HEIGHT; y++)
         {
-            if (!column[y] == BLOCK_COLOR_COUNT)
+            if (isPiece(x, y))
             {
 
-                drawPiece(x,y, column[y]);
+                uint16_t drawX = 70 + x * CELL_SIZE;
+                uint16_t drawY = y * CELL_SIZE;
+                drawPiece(drawX, drawY, column[y]);
             }
         }
     }
+    printf("board redrawn\n");
 }
 
 bool canMove(int xdirection)
@@ -198,12 +208,12 @@ bool canMove(int xdirection)
     for (uint8_t i = 0; i < fallingBlockPieceCount; i++)
     {
         Vector2i Piece = fallingBlockPieces[i] + fallingBlockPos;
-        if (board[xdirection + Piece.x][Piece.y] != BLOCK_COLOR_COUNT)
+        if (isPiece(xdirection + Piece.x, Piece.y))
         {
             can_move = false;
             break;
         }
-        if (xdirection + Piece.x < 0 || xdirection + Piece.x > BOARD_WIDTH-1)
+        if (xdirection + Piece.x < 0 || xdirection + Piece.x > BOARD_WIDTH - 1)
         {
             can_move = false;
             break;
@@ -225,52 +235,61 @@ void GenerateBlock()
 
 void CheckClearRow()
 {
+    bool redraw_needed = false;
     for (int y = 0; y < BOARD_HEIGHT; y++)
     {
         bool has_empty = false;
         for (int x = 0; x < BOARD_WIDTH; x++)
         {
-            if (board[x][y] == BLOCK_COLOR_COUNT)
+            if (!isPiece(x, y))
             {
                 has_empty = true;
+                break;
             }
         }
 
-        //clear board
+        // clear board
         if (!has_empty)
         {
+            redraw_needed = true;
+            printf("clearing: %d\n", y);
             for (int x = 0; x < BOARD_WIDTH; x++)
             {
-                board[x][y] = false;
+                board[x][y] = BLOCK_COLOR_COUNT;
             }
 
             for (int y2 = y - 1; y2 > 0; y2--)
             {
                 for (int x2 = 0; x2 < BOARD_WIDTH; x2++)
                 {
-                    if (board[x2][y2])
+                    if (isPiece(x2, y2))
                     {
-                        board[x2][y2] = false;
-                        board[x2][y2 + 1] = true;
+                        board[x2][y2 + 1] = board[x2][y2];
+                        board[x2][y2] = BLOCK_COLOR_COUNT;
                     }
                 }
             }
-            redrawBoard();
         }
+    }
+    if (redraw_needed)
+    {
+        redrawBoard();
     }
 }
 
 void software_reset()
 {
     watchdog_enable(1, 1);
-    while (1);
+    while (1)
+        ;
 }
 
 void checkGameOver()
 {
-    Vector2i comp = {5, 1};
+    Vector2i comp = {5, 3};
     if (fallingBlockPos == comp)
     {
+        printf("game over\n");
         software_reset();
     }
 }
@@ -299,16 +318,22 @@ void doColisions()
             Vector2i Piece = fallingBlockPieces[i] + fallingBlockPos;
             board[Piece.x][Piece.y] = true;
         }
+        printf("checking game over\n");
         checkGameOver();
+        printf("checking for clear rows\n");
         speed += 1;
         CheckClearRow();
+        printf("generating block\n");
         GenerateBlock();
     }
 }
 
-void fillBoard(){
-    for (int x = 0; x < BOARD_WIDTH; x++){
-        for (int y = 0; y < BOARD_HEIGHT; y++){
+void fillBoard()
+{
+    for (int x = 0; x < BOARD_WIDTH; x++)
+    {
+        for (int y = 0; y < BOARD_HEIGHT; y++)
+        {
             board[x][y] = BLOCK_COLOR_COUNT;
         }
     }
