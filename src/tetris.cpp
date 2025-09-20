@@ -286,7 +286,7 @@ void software_reset()
 
 void checkGameOver()
 {
-    Vector2i comp = {5, 3};
+    Vector2i comp = {5, 2};
     if (fallingBlockPos == comp)
     {
         printf("game over\n");
