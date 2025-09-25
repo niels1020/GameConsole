@@ -110,11 +110,12 @@ bool isPiece(uint x, uint y)
 // checks if a position is out of bounds
 bool IsPosOutOfBounds(Vector2i pos)
 {
-    if (pos.x < 0 && pos.y < 0)
+    //no upper limit needed
+    if (pos.x < 0)
     {
         return true;
     }
-    if (pos.y > BOARD_HEIGHT-1 && pos.x > BOARD_WIDTH)
+    if (pos.y > BOARD_HEIGHT-1 || pos.x > BOARD_WIDTH)
     {
         return true;
     }
@@ -136,11 +137,16 @@ bool canExist(Vector2i block[4], uint8_t pieceCount, Vector2i position)
         // check out of bounds
         if (IsPosOutOfBounds(piece))
         {
-            printf("cannot exist: %d, %d\n", piece.x, piece.y);
+            printf("out of bounds: %d, %d\n", piece.x, piece.y);
             return false;
         }
 
-        // chek for other pieces in the sam pos
+        //check for piece being in spawning space so we can skip the check for sharing a spot witch will try to take a negative index on an array
+        if (piece.y < 0){
+            continue;
+        }
+
+        // chek for other pieces in the same pos
         if (!isCellEmpty(piece))
         {
             printf("cannot exist: %d, %d\n", piece.x, piece.y);
@@ -336,47 +342,26 @@ void software_reset()
         ;
 }
 
-// TODO: replace with can Exist
 void checkGameOver()
 {
-    Vector2i comp = {5, 2};
-    if (fallingBlockPos == comp)
+    if (!canExist(fallingBlockPieces,fallingBlockPieceCount, fallingBlockPos))
     {
         printf("game over\n");
         software_reset();
     }
 }
 
-// TODO: replace with can Exist check
-void doColisions()
+void handleColision()
 {
-    bool collided = false;
     for (uint8_t i = 0; i < fallingBlockPieceCount; i++)
     {
         Vector2i Piece = fallingBlockPieces[i] + fallingBlockPos;
-        if (Piece.y >= BOARD_HEIGHT - 1)
-        {
-            collided = true;
-            continue;
-        }
-        Vector2i checkPos = {Piece.x, Piece.y + 1};
-        if (board[checkPos.x][checkPos.y] != BLOCK_COLOR_COUNT)
-        {
-            collided = true;
-        }
+        board[Piece.x][Piece.y] = true;
     }
-    if (collided)
-    {
-        for (uint8_t i = 0; i < fallingBlockPieceCount; i++)
-        {
-            Vector2i Piece = fallingBlockPieces[i] + fallingBlockPos;
-            board[Piece.x][Piece.y] = true;
-        }
-        checkGameOver();
-        speed += 1;
-        CheckClearRow();
-        GenerateBlock();
-    }
+    speed += 1;
+    CheckClearRow();
+    GenerateBlock();
+    checkGameOver();
 }
 
 void fillBoard()
@@ -414,7 +399,10 @@ void tetrisLaunch()
             fallingBlockPos = newPos;
             DrawFallingBlock();
         }
-        doColisions();
+        else
+        {
+            handleColision();
+        }
         physicsProccesing = false;
     }
 }
