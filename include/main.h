@@ -32,6 +32,8 @@ state: true = high, false = low
 */
 void ButtonPressed(uint buttonn, bool state);
 
+//TODO: add game selection for user
+
 //Game selection
 #define TETRIS
 
@@ -41,3 +43,5 @@ void ButtonPressed(uint buttonn, bool state);
 #define LAUNCH tetrisLaunch
 #define INPUT tetrisInput
 #endif
+
+//TODO: add pong

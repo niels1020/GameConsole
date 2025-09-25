@@ -1,6 +1,7 @@
 #include "main.h"
 #ifdef TETRIS
-
+// TODO: make less global for less memory in use when not being played
+// TODO: more docs
 bool speed = 0;
 bool running = true;
 
@@ -72,20 +73,80 @@ Color BlockCollors[] = {COLOR_BLUE, COLOR_RED, COLOR_BEIGE, COLOR_DARKGRAY, COLO
 Color BlockHighLightCollors[] = {COLOR_AQUA, COLOR_SALMON, COLOR_WHITE, COLOR_LIGHTGRAY, COLOR_ORANGE};
 uint BlockColorIndex = 0;
 
+// TODO: expand and move falling block to this
+// struct for combining block data
+struct BlockData
+{
+    Vector2i pieces[4];
+    uint8_t pieceAmount;
+};
+
+// operators for Vector2i
 Vector2i operator+(Vector2i a, Vector2i b)
 {
     return {a.x + b.x, a.y + b.y};
 }
-
 bool operator==(Vector2i a, Vector2i b)
 {
     return (a.x == b.x && a.y == b.y);
 }
 
+// returns true if a specific cell in the board is empty
+bool isCellEmpty(Vector2i pos)
+{
+    return board[pos.x][pos.y] >= BLOCK_COLOR_COUNT;
+}
+
+// Duplicate use isCellEmpty
 // checks if there is a piece at the specific location in the board
 bool isPiece(uint x, uint y)
 {
-    return board[x][y] != BLOCK_COLOR_COUNT;
+    return !isCellEmpty({(int)x, (int)y});
+}
+
+// checks if a position is out of bounds
+bool IsPosOutOfBounds(Vector2i pos)
+{
+    if (pos.x < 0 && pos.y < 0)
+    {
+        return true;
+    }
+    if (pos.y > BOARD_HEIGHT-1 && pos.x > BOARD_WIDTH)
+    {
+        return true;
+    }
+    // no else needed because of early return
+    // this reached means in bounds or there is a bug
+    return false;
+}
+
+// checks if in a given scenario for falling piece is not in another piece or out of bounds
+bool canExist(Vector2i block[4], uint8_t pieceCount, Vector2i position)
+{
+    // early exit if it cannot exist
+    for (int i = 0; i < pieceCount; i++)
+    {
+        // get piece
+        Vector2i rawPiece = block[i];
+        Vector2i piece = rawPiece + position;
+
+        // check out of bounds
+        if (IsPosOutOfBounds(piece))
+        {
+            printf("cannot exist: %d, %d\n", piece.x, piece.y);
+            return false;
+        }
+
+        // chek for other pieces in the sam pos
+        if (!isCellEmpty(piece))
+        {
+            printf("cannot exist: %d, %d\n", piece.x, piece.y);
+            return false;
+        }
+    }
+
+    // only reacheble if checks have been good
+    return true;
 }
 
 void drawPiece(uint16_t x, uint16_t y, uint colorIndex)
@@ -163,20 +224,23 @@ const Vector2i blockShapes[BLOCK_COUNT][4][4] = {
         {{1, 1}, {0, 1}, {0, 0}, {0, -1}},
         {{1, 0}, {0, 0}, {-1, 0}, {-1, 1}}}};
 
-void setFallingBlockPieces()
+// gets the pieces of a block use pointers for setting needed data
+BlockData GetBlockPieces(Block type, uint8_t rotation)
 {
-    if (fallingBlock >= BLOCK_COUNT || fallingBlockRotation < 0 || fallingBlockRotation > 3)
+    BlockData data;
+
+    if (type >= BLOCK_COUNT || rotation < 0 || rotation > 3)
     {
-        fallingBlockPieceCount = 0;
-        return;
+        data.pieceAmount = 0;
     }
 
     for (int i = 0; i < 4; ++i)
     {
-        fallingBlockPieces[i] = blockShapes[fallingBlock][fallingBlockRotation][i];
+        data.pieces[i] = blockShapes[type][rotation][i];
+        data.pieceAmount = 4;
     }
 
-    fallingBlockPieceCount = 4;
+    return data;
 }
 
 void redrawBoard()
@@ -201,27 +265,6 @@ void redrawBoard()
     printf("board redrawn\n");
 }
 
-bool canMove(int xdirection)
-{
-    bool can_move = true;
-
-    for (uint8_t i = 0; i < fallingBlockPieceCount; i++)
-    {
-        Vector2i Piece = fallingBlockPieces[i] + fallingBlockPos;
-        if (isPiece(xdirection + Piece.x, Piece.y))
-        {
-            can_move = false;
-            break;
-        }
-        if (xdirection + Piece.x < 0 || xdirection + Piece.x > BOARD_WIDTH - 1)
-        {
-            can_move = false;
-            break;
-        }
-    }
-    return can_move;
-}
-
 void GenerateBlock()
 {
     int randomIndex = rand() % BLOCK_COUNT;
@@ -230,7 +273,13 @@ void GenerateBlock()
     BlockColorIndex = rand() % BLOCK_COLOR_COUNT;
     fallingBlockRotation = rand() % 4;
     fallingBlockPos = {5, 0};
-    setFallingBlockPieces();
+    BlockData data = GetBlockPieces(fallingBlock, fallingBlockRotation);
+    fallingBlockPieceCount = data.pieceAmount;
+    // manually copy over because c++
+    for (int i = 0; i < fallingBlockPieceCount; ++i)
+    {
+        fallingBlockPieces[i] = data.pieces[i];
+    }
 }
 
 void CheckClearRow()
@@ -284,6 +333,7 @@ void software_reset()
         ;
 }
 
+// TODO: replace with can Exist
 void checkGameOver()
 {
     Vector2i comp = {5, 2};
@@ -294,6 +344,7 @@ void checkGameOver()
     }
 }
 
+// TODO: replace with can Exist check
 void doColisions()
 {
     bool collided = false;
@@ -318,12 +369,9 @@ void doColisions()
             Vector2i Piece = fallingBlockPieces[i] + fallingBlockPos;
             board[Piece.x][Piece.y] = true;
         }
-        printf("checking game over\n");
         checkGameOver();
-        printf("checking for clear rows\n");
         speed += 1;
         CheckClearRow();
-        printf("generating block\n");
         GenerateBlock();
     }
 }
@@ -356,9 +404,13 @@ void tetrisLaunch()
         }
 
         physicsProccesing = true;
-        clearFallingBlock();
-        fallingBlockPos.y += 1;
-        DrawFallingBlock();
+        Vector2i newPos = {fallingBlockPos.x, fallingBlockPos.y + 1};
+        if (canExist(fallingBlockPieces, fallingBlockPieceCount, newPos))
+        {
+            clearFallingBlock();
+            fallingBlockPos = newPos;
+            DrawFallingBlock();
+        }
         doColisions();
         physicsProccesing = false;
     }
@@ -374,19 +426,30 @@ void tetrisInput(uint button, bool state)
         if (button == Button1)
         {
             InputProccessing = true;
-            clearFallingBlock();
-            fallingBlockRotation = fallingBlockRotation == 0 ? 3 : fallingBlockRotation - 1;
-            setFallingBlockPieces();
-            DrawFallingBlock();
+            uint8_t rotation = fallingBlockRotation == 0 ? 3 : fallingBlockRotation - 1;
+            BlockData data = GetBlockPieces(fallingBlock, rotation);
+            if (canExist(data.pieces, data.pieceAmount, fallingBlockPos))
+            {
+                clearFallingBlock();
+                fallingBlockRotation = rotation;
+                fallingBlockPieceCount = data.pieceAmount;
+                // manually copy over because c++
+                for (int i = 0; i < fallingBlockPieceCount; ++i)
+                {
+                    fallingBlockPieces[i] = data.pieces[i];
+                }
+                DrawFallingBlock();
+            }
             InputProccessing = false;
         }
         else if (button == Button2)
         {
             InputProccessing = true;
-            if (canMove(-1))
+            Vector2i newPos = {fallingBlockPos.x - 1, fallingBlockPos.y};
+            if (canExist(fallingBlockPieces, fallingBlockPieceCount, newPos))
             {
                 clearFallingBlock();
-                fallingBlockPos.x -= 1;
+                fallingBlockPos = newPos;
                 DrawFallingBlock();
             }
             InputProccessing = false;
@@ -394,19 +457,23 @@ void tetrisInput(uint button, bool state)
         else if (button == Button3)
         {
             InputProccessing = true;
-            clearFallingBlock();
-            fallingBlockPos.y += 1;
-            DrawFallingBlock();
-            doColisions();
+            Vector2i newPos = {fallingBlockPos.x, fallingBlockPos.y + 1};
+            if (canExist(fallingBlockPieces, fallingBlockPieceCount, newPos))
+            {
+                clearFallingBlock();
+                fallingBlockPos = newPos;
+                DrawFallingBlock();
+            }
             InputProccessing = false;
         }
         else if (button == Button4)
         {
             InputProccessing = true;
-            if (canMove(1))
+            Vector2i newPos = {fallingBlockPos.x + 1, fallingBlockPos.y};
+            if (canExist(fallingBlockPieces, fallingBlockPieceCount, newPos))
             {
                 clearFallingBlock();
-                fallingBlockPos.x += 1;
+                fallingBlockPos = newPos;
                 DrawFallingBlock();
             }
             InputProccessing = false;
