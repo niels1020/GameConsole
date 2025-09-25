@@ -1,3 +1,6 @@
+/*
+file for tetris game
+*/
 #include "main.h"
 #ifdef TETRIS
 // TODO: make less global for less memory in use when not being played

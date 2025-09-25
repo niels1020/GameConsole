@@ -1,3 +1,4 @@
+//file for rendering things
 #include "main.h"
 
 void GraphicsDrawPixel(uint16_t x, uint16_t y, uint16_t color)

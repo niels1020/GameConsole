@@ -1,4 +1,6 @@
+//file for handling input
 #include "main.h"
+
 
 void GpioCallback(uint gpio, uint32_t event_mask)
 {
@@ -11,23 +13,6 @@ void GpioCallback(uint gpio, uint32_t event_mask)
         ButtonPressed(gpio, false);
     }
 }
-
-/*
-DEBOUNCE
-#define DEBOUNCE_DELAY_MS 50
-static absolute_time_t last_interrupt_time = 0;
-
-void GpioCallback(uint gpio, uint32_t event_mask) {
-    absolute_time_t now = get_absolute_time();
-    if (absolute_time_diff_us(last_interrupt_time, now) < DEBOUNCE_DELAY_MS * 1000) {
-        return; // Ignore bounce
-    }
-    last_interrupt_time = now;
-
-    printf("GPIO callback. Pin: %d, Event: %d\n", gpio, event_mask);
-    ButtonPressed(gpio, event_mask == GPIO_IRQ_EDGE_RISE);
-}
-*/
 
 void InputInit()
 {

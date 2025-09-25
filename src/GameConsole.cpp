@@ -1,3 +1,4 @@
+//entry point
 #include "main.h"
 
 void ButtonPressed(uint button, bool state){
